@@ -4,9 +4,13 @@ import cv2
 
 def sobel_xy(img, orient='x', thresh=(20, 100)):  # hàm tính sobel theo x hoặc y
     """
-    Định nghĩa một hàm áp dụng Sobel x hoặc y.
-    Độ dốc theo hướng x nhấn mạnh các cạnh gần với dọc.
-    Độ dốc theo hướng y nhấn mạnh các cạnh gần với ngang.
+    Hàm tính độ dốc theo x hoặc y và trả về ảnh nhị phân
+
+    :param img: ảnh đầu vào
+    :param orient: hướng của độ dốc
+    :param thresh: ngưỡng
+
+    :return: ảnh nhị phân
     """
     # Cân bằng histogram
     if orient == 'x':  # nêu là x thì lấy đạo hàm theo x
@@ -29,8 +33,13 @@ def sobel_xy(img, orient='x', thresh=(20, 100)):  # hàm tính sobel theo x ho�
 
 def mag_thresh(img, sobel_kernel=3, mag_thresh=(0, 255)):  # hàm tính độ dốc
     """
-    Định nghĩa một hàm trả về độ lớn của độ dốc
-    cho một kích thước kernel sobel cụ thể và các giá trị ngưỡng
+    Hàm tính độ dốc và trả về ảnh nhị phân
+
+    :param img: ảnh đầu vào
+    :param sobel_kernel: kích thước của Sobel kernel
+    :param mag_thresh: ngưỡng
+
+    :return: ảnh nhị phân
     """
     # Take both Sobel x and y gradients
     # Tính độ dốc theo x và y
@@ -53,6 +62,15 @@ def mag_thresh(img, sobel_kernel=3, mag_thresh=(0, 255)):  # hàm tính độ d�
 
 
 def dir_thresh(img, sobel_kernel=3, thresh=(0.7, 1.3)):  # hàm tính hướng của độ dốc
+    """
+    Hàm tính hướng của độ dốc và trả về ảnh nhị phân
+
+    :param img: ảnh đầu vào
+    :param sobel_kernel: kích thước của Sobel kernel
+    :param thresh: ngưỡng
+
+    :return: ảnh nhị phân
+    """
     # tính toán đạo hàm Sobel theo cả hai hướng x và y
     sobelx = cv2.Sobel(img, cv2.CV_64F, 1, 0, ksize=sobel_kernel)
     sobely = cv2.Sobel(img, cv2.CV_64F, 0, 1, ksize=sobel_kernel)
@@ -68,6 +86,14 @@ def dir_thresh(img, sobel_kernel=3, thresh=(0.7, 1.3)):  # hàm tính hướng c
 
 
 def ch_thresh(ch, thresh=(80, 255)):
+    """
+    Hàm tính ngưỡng cho kênh màu và trả về ảnh nhị phân
+
+    :param ch: kênh màu
+    :param thresh: ngưỡng
+
+    :return: ảnh nhị phân
+    """
     binary = np.zeros_like(ch)
     binary[(ch > thresh[0]) & (ch <= thresh[1])] = 255
     return binary
@@ -75,7 +101,15 @@ def ch_thresh(ch, thresh=(80, 255)):
 
 def gradient_combine(img, th_x, th_y, th_mag, th_dir):
     """
-    Find lane lines with gradient information of Red channel
+    Hàm kết hợp các kết quả của các hàm tính độ dốc theo x, y, độ lớn và hướng
+
+    :param img: ảnh đầu vào
+    :param th_x: ngưỡng cho độ dốc theo x
+    :param th_y: ngưỡng cho độ dốc theo y
+    :param th_mag: ngưỡng cho độ lớn của độ dốc
+    :param th_dir: ngưỡng cho hướng của độ dốc
+
+    :return: ảnh nhị phân
     """
     rows, cols = img.shape[:2]  # lấy kích thước của ảnh
     R = img[220:rows - 12, 0:cols, 2]  # lấy kênh màu Red của ảnh
@@ -100,6 +134,17 @@ def gradient_combine(img, th_x, th_y, th_mag, th_dir):
 
 
 def hls_combine(img, th_h, th_l, th_s):
+    """
+    Hàm kết hợp các kết quả của các hàm tính kênh màu Hue, Lightness và Saturation
+
+    :param img: ảnh đầu vào
+    :param th_h: ngưỡng cho kênh màu Hue
+    :param th_l: ngưỡng cho kênh màu Lightness
+    :param th_s: ngưỡng cho kênh màu Saturation
+
+    :return: ảnh nhị phân
+    """
+
     # convert to hls color space
     # chuyển ảnh sang không gian màu HLS
     hls = cv2.cvtColor(img, cv2.COLOR_BGR2HLS)
@@ -131,7 +176,14 @@ def hls_combine(img, th_h, th_l, th_s):
 
 
 def comb_result(grad, hls):
-    """ give different value to distinguish them """
+    """ 
+    Hàm kết hợp kết quả của hàm gradient_combine và hàm hls_combine
+
+    :param grad: ảnh nhị phân kết quả của hàm gradient_combine
+    :param hls: ảnh nhị phân kết quả của hàm hls_combine
+
+    :return: ảnh nhị phân kết quả của hàm kết hợp
+    """
     result = np.zeros_like(hls).astype(np.uint8)
     #result[((grad > 1) | (hls > 1))] = 255
     result[(grad > 1)] = 100

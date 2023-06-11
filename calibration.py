@@ -13,18 +13,20 @@ imgpoints = []  # 2D points in image plane
 
 def calib():
     """
-    To get an undistorted image, we need camera matrix & distortion coefficient
-    Calculate them with 9*6 20 chessboard images
+    Để có được ảnh không méo, chúng ta cần ma trận camera và hệ số méo
+    Tính toán chúng với 20 hình ảnh bàn cờ 9 * 6
+
+    :return: ma trận camera và hệ số méo
     """
     # Prepare object points
     # Tạo điểm đối tượng
-    objp = np.zeros((6 * 9, 3), np.float32)  # 6*9 points, 3D
-    objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)  # x, y coordinates
+    objp = np.zeros((6 * 9, 3), np.float32)  # 54 điểm đối tượng
+    objp[:, :2] = np.mgrid[0:9, 0:6].T.reshape(-1, 2)  # x, y cordinates
 
-    for fname in images:
+    for fname in images:  # Duyệt qua danh sách các hình ảnh
 
-        img = mpimg.imread(fname)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        img = mpimg.imread(fname)  # Đọc ảnh
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)  # Chuyển sang ảnh xám
 
         # Tìm góc bàn cờ
         ret, corners = cv2.findChessboardCorners(gray, (9, 6), None)
@@ -37,11 +39,21 @@ def calib():
             continue
     # Sử dụng các điểm ảnh và điểm đối tượng để tính toán ma trận camera và hệ số méo
     ret, mtx, dist, rvecs, tvecs = cv2.calibrateCamera(
-        objpoints, imgpoints, gray.shape[::-1], None, None)
+        objpoints, imgpoints, gray.shape[::-1], None, None)  # Ở đây chúng ta không cần biến rvecs và tvecs
 
-    return mtx, dist
+    return mtx, dist  # Trả về ma trận camera và hệ số méo
 
 
 def undistort(img, mtx, dist):
+    """
+    Loại bỏ méo khỏi ảnh
+
+    :param img: ảnh đầu vào
+    :param mtx: ma trận camera
+    :param dist: hệ số méo
+
+    :return: ảnh không méo
+    """
+
     # Sử dụng ma trận camera và hệ số méo để loại bỏ méo
     return cv2.undistort(img, mtx, dist, None, mtx)

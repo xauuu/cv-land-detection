@@ -6,63 +6,48 @@ import matplotlib.image as mpimg
 
 class Line:
     def __init__(self):
-        # was the line detected in the last iteration?
-        self.detected = False
-        # Set the width of the windows +/- margin
-        self.window_margin = 56
-        # x values of the fitted line over the last n iterations
-        self.prevx = []
-        # polynomial coefficients for the most recent fit
-        self.current_fit = [np.array([False])]
-        # radius of curvature of the line in some units
-        self.radius_of_curvature = None
-        # starting x_value
-        self.startx = None
-        # ending x_value
-        self.endx = None
-        # x values for detected line pixels
-        self.allx = None
-        # y values for detected line pixels
-        self.ally = None
-        # road information
-        self.road_inf = None
-        self.curvature = None
-        self.deviation = None
+        self.detected = False # đường đi có được phát hiện trong lần lặp cuối cùng không?
+        self.window_margin = 56 # đặt chiều rộng của cửa sổ +/- margin
+        self.prevx = [] # danh sách các tọa độ x của các điểm trên đường đi trong lần lặp trước
+        self.current_fit = [np.array([False])] # hệ số đa thức cho đường đi hiện tại
+        self.radius_of_curvature = None # bán kính cong của đường đi
+        self.startx = None # tọa độ x của điểm bắt đầu của đường đi
+        self.endx = None # tọa độ x của điểm kết thúc của đường đi
+        self.allx = None # tọa độ x của các điểm trên đường đi
+        self.ally = None # tọa độ y của các điểm trên đường đi
+        self.road_inf = None # thông tin về đường đi
+        self.curvature = None # bán kính cong của đường đi
+        self.deviation = None # độ lệch của xe so với trung tâm làn đường
 
 
 def warp_image(img, src, dst, size):
     """
-        Chức năng thực hiện phép biến đổi hình thái (perspective transform) cho một ảnh đầu vào.
-        Input:
-            img: ảnh đầu vào
-            src: tọa độ 4 điểm trên ảnh gốc
-            dst: tọa độ 4 điểm trên ảnh đích
-            size: kích thước ảnh đầu ra
-        Output:
-            warp_img: ảnh đầu ra sau khi thực hiện phép biến đổi hình thái
-            M: ma trận biến đổi
-            Minv: ma trận biến đổi ngược
-    """
-    # matrix M, and its inverse Minv.
-    # hàm getPerspectiveTransform() trả về ma trận biến đổi
-    M = cv2.getPerspectiveTransform(src, dst)
-    # hàm getPerspectiveTransform() trả về ma trận biến đổi ngược
-    Minv = cv2.getPerspectiveTransform(dst, src)
-    # hàm warpPerspective() thực hiện phép biến đổi hình thái
-    warp_img = cv2.warpPerspective(img, M, size, flags=cv2.INTER_LINEAR)
+    Thực hiện phép biến đổi hình thái để chuyển đổi hình ảnh thành góc nhìn từ trên xuống
 
+    :param img: hình ảnh gốc
+    :param src: tọa độ của 4 điểm trên hình ảnh gốc
+    :param dst: tọa độ của 4 điểm trên hình ảnh đích
+    :param size: kích thước của hình ảnh đích
+
+    :return: warp_img: hình ảnh đã được biến đổi
+                    M: ma trận biến đổi
+                 Minv: ma trận biến đổi ngược
+    """
+    M = cv2.getPerspectiveTransform(src, dst) # ma trận biến đổi
+    Minv = cv2.getPerspectiveTransform(dst, src) # ma trận biến đổi ngược
+    warp_img = cv2.warpPerspective(img, M, size, flags=cv2.INTER_LINEAR) # hàm warpPerspective() thực hiện phép biến đổi hình thái
+ 
     return warp_img, M, Minv
 
 
 def rad_of_curvature(left_line, right_line):
     """
-    Tính toán bán kính cong của các đường lái xe trái và phải dựa trên tọa độ pixel của chúng
-    Input:
-        left_line: đường đi bên trái
-        right_line: đường đi bên phải
-    Output:
-        left_line.radius_of_curvature: bán kính cong của đường đi bên trái
-        right_line.radius_of_curvature: bán kính cong của đường đi bên phải
+    Tính bán kính cong của đường đi bên trái và bên phải
+
+    :param left_line: đường đi bên trái
+    :param right_line: đường đi bên phải
+
+    :return: None
     """
 
     ploty = left_line.ally  # hàm ally() trả về tọa độ y của các điểm trên đường đi bên trái
@@ -101,12 +86,12 @@ def rad_of_curvature(left_line, right_line):
 
 def smoothing(lines, pre_lines=3):
     """
-    Tính trung bình độ cong của các đường lái xe gần đây, giúp giảm nhiễu và làm cho dự báo ổn định hơn.
-    Input:
-        lines: danh sách các đường lái xe gần đây
-        pre_lines: số lượng đường lái xe gần đây
-    Output:
-        avg_line: đường lái xe trung bình
+    Trung bình hóa các đường lái xe gần đây để tìm đường lái xe trung bình
+
+    :param lines: các đường lái xe gần đây
+    :param pre_lines: số lượng đường lái xe gần đây
+
+    :return: avg_line: đường lái xe trung bình
     """
     # thu thập các đường lái xe và in đường lái xe trung bình
     # hàm squeeze() loại bỏ các chiều không cần thiết của mảng
@@ -126,19 +111,13 @@ def smoothing(lines, pre_lines=3):
 
 def blind_search(b_img, left_line, right_line):
     """
-    blind search - first frame, lost lane lines
-    using histogram & sliding window
-    """
-    """
-    Sử dụng để tìm kiếm đường lái trong một hình ảnh, khi không có đường lái nào được xác định trước hoặc các đường lái bị mất.
-    Được sử dụng trong trường hợp đầu tiên, khi chúng ta không có thông tin về các đường lái xe.
-    Input:
-        b_img: ảnh nhị phân
-        left_line: làn đường bên trái, lưu trữ thông tin của đường lái xe bên trái
-        right_line: làn đường bên phải, lưu trữ thông tin của đường lái xe bên phải
-    Output:
-        left_line: làn đường bên trái, lưu trữ thông tin của đường lái xe bên trái
-        right_line: làn đường bên phải, lưu trữ thông tin của đường lái xe bên phải
+    Tìm kiếm mù cho đường lái xe bên trái và bên phải
+
+    :param b_img: hình ảnh nhị phân
+    :param left_line: đường lái xe bên trái
+    :param right_line: đường lái xe bên phải
+
+    :return: left_line, right_line
     """
     # Lấy lược đồ của nửa dưới của hình ảnh
     histogram = np.sum(b_img[int(b_img.shape[0] / 2):, :], axis=0)
@@ -294,16 +273,11 @@ def blind_search(b_img, left_line, right_line):
 
 def prev_window_refer(b_img, left_line, right_line):
     """
-    refer to previous window info - after detecting lane lines in previous frame
-    """
-    """
-    Hàm này sẽ tìm đường cong bậc 2 phù hợp với các điểm ảnh khác 0 trong cửa sổ trái và phải
-    Input:
-        b_img: ảnh nhị phân
-        left_line: đường cong bậc 2 của cửa sổ trái
-        right_line: đường cong bậc 2 của cửa sổ phải
-    Output:
-        output: ảnh kết quả
+    Tìm đường cong bậc 2 phù hợp với các điểm ảnh khác 0 trong cửa sổ trái và phải
+
+    :param b_img: ảnh nhị phân
+    :param left_line: đường cong bậc 2 trái
+    :param right_line: đường cong bậc 2 phải
     """
     # Create an output image to draw on and  visualize the result
     output = np.dstack((b_img, b_img, b_img)) * 255
@@ -397,9 +371,13 @@ def prev_window_refer(b_img, left_line, right_line):
 
 def find_LR_lines(binary_img, left_line, right_line):
     """
-    Dùng hàm này để tìm ra 2 đường line trên ảnh binary
-    Input là ảnh binary, 2 đường line trước đó
-    Output là 2 đường line hiện tại
+    Tìm 2 đường line trên ảnh nhị phân
+
+    :param binary_img: ảnh nhị phân
+    :param left_line: đường line bên trái
+    :param right_line: đường line bên phải
+
+    :return: ảnh với 2 đường line
     """
 
     # if don't have lane lines info

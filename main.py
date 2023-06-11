@@ -3,7 +3,7 @@ import cv2
 import matplotlib.pyplot as plt
 import matplotlib.image as mpimg
 from calibration import calib, undistort
-from threshold import gradient_combine, hls_combine, comb_result
+from threshold import gradient_combine, hls_combine, comb_result as combine_result
 from finding_lines import Line, warp_image, find_LR_lines, draw_lane, print_road_status, print_road_map
 from skimage import exposure
 from object_detection import *
@@ -21,55 +21,76 @@ left_line = Line()
 right_line = Line()
 
 th_sobelx, th_sobely, th_mag, th_dir = (
-    35, 100), (30, 255), (30, 255), (0.7, 1.3)
+    35, 100), (30, 255), (30, 255), (0.7, 1.3)  # khởi tạo các giá trị threshold cho gradient
+# khởi tạo các giá trị threshold cho hls
 th_h, th_l, th_s = (10, 100), (0, 60), (85, 255)
 
 # camera matrix & distortion coefficient
+# hàm calib() được lấy từ file calibration.py để lấy ra các giá trị mtx, dist
 mtx, dist = calib()
 
 
 def pipeline_yolo(img):
-    undist_img = undistort(img, mtx, dist)
+    undist_img = undistort(img, mtx, dist)  # loại bỏ độ méo của ảnh
     undist_img = cv2.resize(
-        undist_img, None, fx=1 / 2, fy=1 / 2, interpolation=cv2.INTER_AREA)
+        undist_img, None, fx=1 / 2, fy=1 / 2, interpolation=cv2.INTER_AREA)  # resize ảnh
 
-    detect_from_file(yolo, undist_img)
+    detect_from_file(yolo, undist_img)  # detect các object trong ảnh
 
-    yolo_result = show_results(undist_img, yolo)
-    rows, cols = undist_img.shape[:2]
+    yolo_result = show_results(undist_img, yolo)  # hiển thị kết quả detect
+    rows, cols = undist_img.shape[:2]  # lấy ra số hàng và số cột của ảnh
 
     combined_gradient = gradient_combine(
-        undist_img, th_sobelx, th_sobely, th_mag, th_dir)
+        undist_img, th_sobelx, th_sobely, th_mag, th_dir)  # kết hợp các giá trị threshold của gradient
+    # kết hợp các giá trị threshold của hls
     combined_hls = hls_combine(undist_img, th_h, th_l, th_s)
-    combined_result = comb_result(combined_gradient, combined_hls)
+    # kết hợp kết quả của gradient và hls
+    combined_result = combine_result(combined_gradient, combined_hls)
 
+    # lấy ra số hàng và số cột của ảnh kết hợp
     c_rows, c_cols = combined_result.shape[:2]
+    # tọa độ của 2 điểm trên cùng bên trái và bên phải
     s_LTop2, s_RTop2 = [c_cols / 2 - 24, 5], [c_cols / 2 + 24, 5]
+    # tọa độ của 2 điểm dưới cùng bên trái và bên phải
     s_LBot2, s_RBot2 = [110, c_rows], [c_cols - 110, c_rows]
 
-    src = np.float32([s_LBot2, s_LTop2, s_RTop2, s_RBot2])
+    src = np.float32([s_LBot2, s_LTop2, s_RTop2, s_RBot2]
+                     )  # tọa độ của 4 điểm ở trên
+    # tọa độ của 4 điểm ở dưới
     dst = np.float32([(170, 720), (170, 0), (550, 0), (550, 720)])
 
+    # chuyển đổi ảnh sang dạng top-down view
     warp_img, M, Minv = warp_image(combined_result, src, dst, (720, 720))
-    searching_img = find_LR_lines(warp_img, left_line, right_line)
+    searching_img = find_LR_lines(
+        warp_img, left_line, right_line)  # tìm đường đi của xe
     w_comb_result, w_color_result = draw_lane(
-        searching_img, left_line, right_line)
+        searching_img, left_line, right_line)  # vẽ đường đi của xe
 
     # Drawing the lines back down onto the road
     color_result = cv2.warpPerspective(
-        w_color_result, Minv, (c_cols, c_rows))
-    comb_result_ = np.zeros_like(undist_img)
-    comb_result_[220:rows - 12, 0:cols] = color_result
+        w_color_result, Minv, (c_cols, c_rows))  # chuyển đổi ảnh về dạng ban đầu
+    # tạo 1 ảnh có kích thước bằng ảnh ban đầu
+    comb_result = np.zeros_like(undist_img)
+    # gán ảnh vừa chuyển đổi vào ảnh comb_result
+    comb_result[220:rows - 12, 0:cols] = color_result
 
     # Combine the result with the original image
-    result = cv2.addWeighted(yolo_result, 1, comb_result_, 0.3, 0)
-    info, info2 = np.zeros_like(result),  np.zeros_like(result)
+    # kết hợp ảnh đã detect với ảnh đã vẽ đường đi
+    result = cv2.addWeighted(yolo_result, 1, comb_result, 0.3, 0)
+    info, info2 = np.zeros_like(result),  np.zeros_like(
+        result)  # tạo 2 ảnh có kích thước bằng ảnh result
+    # tạo 1 hình chữ nhật trắng để hiển thị các thông tin
     info[5:110, 5:190] = (255, 255, 255)
+    # tạo 1 hình chữ nhật trắng để hiển thị các thông tin
     info2[5:110, cols-111:cols-6] = (255, 255, 255)
+    # kết hợp ảnh result với info
     info = cv2.addWeighted(result, 1, info, 0.2, 0)
+    # kết hợp ảnh info với info2
     info2 = cv2.addWeighted(info, 1, info2, 0.2, 0)
+    # hiển thị bản đồ đường đi
     road_map = print_road_map(w_color_result, left_line, right_line)
-    info2[10:105, cols-106:cols-11] = road_map
+    info2[10:105, cols-106:cols-11] = road_map  # gán bản đồ đường đi vào info2
+    # hiển thị các thông tin về đường đi
     info2 = print_road_status(info2, left_line, right_line)
     return info2
 
