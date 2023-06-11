@@ -1,0 +1,7 @@
+.idea
+__pycache__
+/weights
+project_video.mp4
+/test_images
+challenge_video.mp4
+project_video_output.mp4
